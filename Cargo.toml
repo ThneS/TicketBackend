@@ -1,0 +1,9 @@
+[package]
+name = "backend"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+alloy = { version = "1.0.24", features = ["full"] }
+eyre = "0.6.12"
+tokio = { version = "1.47.1", features = ["full"] }
