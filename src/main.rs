@@ -1,55 +1,80 @@
 pub mod bindings;
-mod ticket_manager;
+mod db;
+mod event;
+mod repo;
+use std::{env, str::FromStr};
 
+use crate::{db::Db, event::router::route_log};
 use alloy::{
-    primitives::{address, keccak256},
-    providers::{ProviderBuilder, WsConnect},
-    signers::local::PrivateKeySigner,
+    primitives::Address,
+    providers::{Provider, ProviderBuilder, WsConnect},
+    rpc::types::{BlockNumberOrTag, Filter},
 };
+
+use dotenv::dotenv;
 use eyre::{Ok, Result};
-use ticket_manager::get_ticket_manager_instance;
+use futures_util::stream::StreamExt;
+
+#[derive(Clone, Debug)]
+pub struct FeatureFlags {
+    pub print_raw_logs: bool,
+    pub print_unknown: bool,
+}
+
+#[derive(Clone, Debug)]
+pub struct AddressMap {
+    pub did_registry: Address,
+    pub show_manager: Address,
+}
+use tokio::signal;
+
+async fn listen_app() -> Result<()> {
+    let app = axum::Router::new();
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:3000").await?;
+    let _ = axum::serve(listener, app).await;
+    Ok(())
+}
+
+async fn listen_chain(
+    addr_map: AddressMap,
+    flags: FeatureFlags,
+    db: Db,
+) -> Result<()> {
+    let ws = WsConnect::new("ws://127.0.0.1:8545");
+    let provider = ProviderBuilder::new().connect_ws(ws).await?;
+    let filter = Filter::new().from_block(BlockNumberOrTag::Latest);
+    // Subscribe to logs.
+    let sub = provider.subscribe_logs(&filter).await?;
+    let mut stream = sub.into_stream();
+
+    while let Some(log) = stream.next().await {
+        route_log(log, &addr_map, &flags, &db).await;
+    }
+    Ok(())
+}
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let ws_url = "ws://127.0.0.1:8545";
-    let ws = WsConnect::new(ws_url);
-    let signer: PrivateKeySigner =
-        "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80".parse()?;
-    let provider = ProviderBuilder::new()
-        .wallet(signer)
-        .connect_ws(ws)
-        .await
-        .unwrap();
-    let tm_instance = get_ticket_manager_instance(provider.clone())?;
+    dotenv().ok();
+    let did = Address::from_str(&env::var("DID_REGISTRY_ADDRESS")?)?;
+    let show = Address::from_str(&env::var("SHOW_MANAGER_ADDRESS")?)?;
+    let addr_map = AddressMap {
+        did_registry: did,
+        show_manager: show,
+    };
+    let flags = FeatureFlags {
+        print_raw_logs: env::var("PRINT_RAW_LOGS").ok().as_deref() == Some("1"),
+        print_unknown: env::var("PRINT_UNKNOWN_LOGS").ok().as_deref()
+            == Some("1"),
+    };
 
-    let owner = address!("70997970C51812dc3A010C7d01b50e0d17dc79C8");
-    let tx_handler = tm_instance
-        .setMinterAuthorization(owner, true)
-        .send()
-        .await?;
-    // 获取交易回执
-    let receipt = tx_handler.get_receipt().await?;
+    let database_url = env::var("DATABASE_URL")?;
+    let db = Db::connect(&database_url, 5).await?;
 
-    for log in receipt.logs() {
-        if log.address() != *tm_instance.address() {
-            continue;
-        }
-        // 安全地读取第一个 topic 并与事件签名比对
-        if let Some(topic0) = log.topics().first() {
-            if *topic0 == keccak256("MinterAuthorized(address,bool)") {
-                println!("MinterAuthorized event found: {:?}", log);
-
-                // 从 indexed topic[1] 解码出 minter（address 占低 20 字节）
-                if let Some(minter_topic) = log.topics().get(1) {
-                    let bytes = minter_topic.as_slice();
-                    let minter = alloy::primitives::Address::from_slice(&bytes[12..]);
-                    println!("Minter: {:?}", minter);
-                }
-            }
-        }
+    tokio::select! {
+        res = listen_app() => { if let Err(e) = res { eprintln!("Error in listen_app: {:?}", e); } }
+        res = listen_chain(addr_map, flags, db.clone()) => { if let Err(e) = res { eprintln!("Error in listen_chain: {:?}", e); } }
+        _ = signal::ctrl_c() => { println!("Received Ctrl+C, shutting down."); }
     }
-    let address = tm_instance.address();
-    println!("TicketManager address: {:?}", address);
-    println!("Hello, world!");
     Ok(())
 }

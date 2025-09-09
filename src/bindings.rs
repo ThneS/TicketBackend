@@ -27,3 +27,17 @@ sol! {
     Marketplace,
     "src/abis/Marketplace.json"
 }
+
+sol! {
+    #[sol(rpc)]
+    #[derive(Debug)]
+    DIDRegistry,
+    "src/abis/DIDRegistry.json"
+}
+
+sol! {
+    #[sol(rpc)]
+    #[derive(Debug)]
+    ShowManager,
+    "src/abis/ShowManager.json"
+}
