@@ -17,7 +17,8 @@ pub async fn parse_event(log: &Log, db: &Db) -> Result<()> {
                 .transaction_hash
                 .map(|h| format!("0x{}", hex::encode(h.as_slice())));
             let block_number: Option<i64> = log.block_number.map(|b| b as i64);
-            let address = format!("0x{}", hex::encode(inner.address.as_slice()));
+            let address =
+                format!("0x{}", hex::encode(inner.address.as_slice()));
 
             // Insert with ON CONFLICT DO NOTHING if we have a natural key.
             // For now use (tx_hash, log_index) uniqueness if available.
@@ -56,12 +57,12 @@ pub async fn parse_event(log: &Log, db: &Db) -> Result<()> {
             let end_u64: u64 = event.endTime.try_into().unwrap_or_default();
             let rec = ShowCreatedRecord {
                 show_id: show_id_u64 as i64,
-                organizer: &organizer_hex,
-                name: &event.name,
+                organizer: organizer_hex,
+                name: event.name.clone(),
                 start_time: start_u64 as i64,
                 end_time: end_u64 as i64,
-                venue: &event.venue,
-                tx_hash: tx_hash.as_deref(),
+                venue: event.venue.clone(),
+                tx_hash: tx_hash.clone(),
                 block_number,
                 log_index,
             };

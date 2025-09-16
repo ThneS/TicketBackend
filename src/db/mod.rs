@@ -1,11 +1,15 @@
 use eyre::Result;
+
 use sqlx::{PgPool, postgres::PgPoolOptions};
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Db(pub PgPool);
 
 impl Db {
-    pub async fn connect(database_url: &str, max_connections: u32) -> Result<Self> {
+    pub async fn connect(
+        database_url: &str,
+        max_connections: u32,
+    ) -> Result<Self> {
         let pool = PgPoolOptions::new()
             .max_connections(max_connections)
             .after_connect(|conn, _meta| {
@@ -28,6 +32,7 @@ impl Db {
 }
 
 // Migration helper (expects sqlx-cli or external migration runner). For now a stub.
+#[allow(unused)]
 pub async fn run_migrations(_pool: &PgPool) -> Result<()> {
     // You can later integrate: sqlx::migrate!("migrations").run(pool).await?;
     Ok(())

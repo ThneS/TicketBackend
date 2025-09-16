@@ -1,10 +1,15 @@
+mod api;
 pub mod bindings;
 mod db;
 mod event;
 mod repo;
 use std::{env, str::FromStr};
 
-use crate::{db::Db, event::router::route_log};
+use crate::{
+    api::{ApiContext, AppState, show_manager},
+    db::Db,
+    event::router::route_log,
+};
 use alloy::{
     primitives::Address,
     providers::{Provider, ProviderBuilder, WsConnect},
@@ -29,7 +34,14 @@ pub struct AddressMap {
 use tokio::signal;
 
 async fn listen_app() -> Result<()> {
-    let app = axum::Router::new();
+    let state = AppState {
+        api: ApiContext {
+            db: Db::connect(&env::var("DATABASE_URL")?, 5).await?,
+        },
+    };
+    let app = axum::Router::new()
+        .route("/show/{id}", axum::routing::get(show_manager::show_with_id))
+        .with_state(state);
     let listener = tokio::net::TcpListener::bind("127.0.0.1:3000").await?;
     let _ = axum::serve(listener, app).await;
     Ok(())
