@@ -80,7 +80,7 @@ pub async fn insert_show_created(
     .bind(rec.log_index.clone())
     .execute(pool)
     .await?;
-    println!("Inserted/Updated show_created_events: {:?}", res);
+    tracing::debug!(?res, "Inserted/Updated show_created_events");
     Ok(())
 }
 
@@ -106,7 +106,7 @@ pub async fn insert_show_created_tx(
     .bind(&rec.organizer)
     .bind(rec.log_index.clone());
     let res = tx.execute(query).await?;
-    println!("Inserted/Updated show_created_events (tx): {:?}", res);
+    tracing::debug!(?res, "Inserted/Updated show_created_events (tx)");
     Ok(())
 }
 
@@ -149,7 +149,7 @@ pub async fn insert_show_created_detail(
     .bind(&rec.metadata_uri)
     .bind(&rec.status as &ShowStatus);
     let res = pool.execute(query).await?;
-    println!("Inserted/Updated show_created_events_detail: {:?}", res);
+    tracing::debug!(?res, "Inserted/Updated show_created_events_detail");
     Ok(())
 }
 
@@ -192,10 +192,7 @@ pub async fn insert_show_created_detail_tx(
     .bind(&rec.metadata_uri)
     .bind(&rec.status as &ShowStatus);
     let res = tx.execute(query).await?;
-    println!(
-        "Inserted/Updated show_created_events_detail (tx): {:?}",
-        res
-    );
+    tracing::debug!(?res, "Inserted/Updated show_created_events_detail (tx)");
     Ok(())
 }
 
@@ -231,7 +228,7 @@ pub async fn insert_show_data(
     .bind(rec.is_active)
     .bind(&rec.organizer);
     let res = pool.execute(query).await?;
-    println!("Inserted/Updated shows: {:?}", res);
+    tracing::debug!(?res, "Inserted/Updated shows");
     Ok(())
 }
 
@@ -267,7 +264,7 @@ pub async fn insert_show_data_tx(
     .bind(rec.is_active)
     .bind(&rec.organizer);
     let res = tx.execute(query).await?;
-    println!("Inserted/Updated shows (tx): {:?}", res);
+    tracing::debug!(?res, "Inserted/Updated shows (tx)");
     Ok(())
 }
 

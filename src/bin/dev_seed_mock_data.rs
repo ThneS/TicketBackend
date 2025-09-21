@@ -4,6 +4,7 @@ use eyre::Result;
 #[tokio::main]
 async fn main() -> Result<()> {
     dotenv::dotenv().ok();
+    backend::logging::init();
     let cfg = config::init_from_env()?;
     let db = Db::connect(&cfg.database_url, 5).await?;
     let _ = backend::db::run_migrations(db.pool()).await;

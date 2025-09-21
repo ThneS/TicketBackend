@@ -96,7 +96,7 @@ pub async fn parse_event<P: Provider + Clone + Send + Sync + 'static>(
     if let Some(topic0) = inner.topics().first() {
         if *topic0 == ShowCreated::SIGNATURE_HASH {
             let event = ShowCreated::decode_log(inner)?;
-            println!("Parsed ShowCreated event: {:?}", event);
+            tracing::info!(?event, "Parsed ShowCreated event");
 
             let tx_hash = log
                 .transaction_hash
@@ -112,7 +112,7 @@ pub async fn parse_event<P: Provider + Clone + Send + Sync + 'static>(
 
             // Fetch on-chain show detail (simple version), ignore errors to avoid blocking ingestion
             if let Ok(show) = get_show_data(provider, event.showId).await {
-                println!("On-chain Show detail fetched: {:?}", show);
+                tracing::debug!(?show, "On-chain Show detail fetched");
                 insert_show_data_value(
                     tx_hash,
                     block_number,

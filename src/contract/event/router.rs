@@ -11,21 +11,22 @@ pub async fn route_log<P: Provider + Clone + Send + Sync + 'static>(
     flags: &crate::contract::FeatureFlags,
     db: &Db,
 ) {
-    if flags.print_raw_logs {
-        println!("RAW LOG: {:?}", log);
-    }
+    // raw log debug is handled below per-address when enabled
     match log.address() {
         addr if *addr == *addr_map.show_manager => {
+            if flags.print_raw_logs {
+                tracing::debug!(?log, "RAW LOG");
+            }
             if let Err(e) = parse_show_created(&log, provider.clone(), db).await
             {
                 if flags.print_unknown {
-                    println!("Unknown ShowManager event: {:?}", e);
+                    tracing::warn!(error = ?e, "Unknown ShowManager event");
                 }
             }
         }
         _ => {
             if flags.print_unknown {
-                println!("Log from unknown address: {:?}", log.address());
+                tracing::debug!(addr = %format!("0x{}", hex::encode(log.address().as_slice())), "Log from unknown address");
             }
         }
     }

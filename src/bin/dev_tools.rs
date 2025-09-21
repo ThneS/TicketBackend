@@ -31,6 +31,7 @@ enum Commands {
 #[tokio::main]
 async fn main() -> Result<()> {
     dotenv::dotenv().ok();
+    backend::logging::init();
     let cli = Cli::parse();
 
     match cli.command {
@@ -70,7 +71,7 @@ async fn update_show(
         metadata_uri,
     )
     .await?;
-    println!("Submitted updateShow transaction for show_id={}", show_id);
+    tracing::info!(show_id, "Submitted updateShow transaction");
     Ok(())
 }
 

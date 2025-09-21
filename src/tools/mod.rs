@@ -124,8 +124,8 @@ pub async fn seed_mock(db: &Db) -> Result<()> {
             &data,
         )
         .await?;
-        println!("Seeded show {} - {}", id.to_string(), name);
+        tracing::info!(show_id = %id.to_string(), name, "Seeded show");
     }
-    println!("Mock data seeding complete.");
+    tracing::info!("Mock data seeding complete.");
     Ok(())
 }

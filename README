@@ -47,3 +47,61 @@ Integration tests (ignored by default; require DATABASE_URL):
     cargo test -p backend -- --ignored
 
 Make sure `.env` contains a valid `DATABASE_URL` before running.
+
+## Logging
+
+后端已集成 tracing 作为统一日志系统，默认输出到控制台（pretty 格式）。可通过环境变量配置：
+
+- RUST_LOG: 过滤规则（示例：`RUST_LOG=backend=debug,axum=info`）。未设置时默认 `info`。
+- LOG_FORMAT: `pretty`（默认）或 `json`，控制控制台日志格式。
+- LOG_FILE: 若设置为文件名（例如 `backend.log`），则在控制台输出的同时额外写入该文件。
+- LOG_ANSI: 设置为 `0` 关闭彩色输出（默认开启）。
+
+Axum 服务器接入了 tower-http 的 TraceLayer，默认记录基本 HTTP 日志；并提供更细粒度开关：
+
+- LOG_HTTP_HEADERS=1 记录请求/响应头部（可能包含敏感信息，生产慎用）
+- LOG_HTTP_BODY=1 记录 body chunk（仅建议开发/调试环境）
+
+应用内部请使用以下宏替代 `println!/eprintln!`：`tracing::info!`, `warn!`, `error!`, `debug!`, `trace!`。
+
+示例：
+
+        RUST_LOG=backend=debug,sqlx=warn LOG_FORMAT=json cargo run --manifest-path backend/Cargo.toml
+
+SQLx 查询耗时日志：
+
+- 开启：`RUST_LOG=sqlx=info`（或 `sqlx=debug` 以获得更详细日志）。
+
+文件滚动：
+
+- 通过以下变量控制：
+  - LOG_FILE=backend.log 指定输出文件名（可包含相对/绝对路径，优先使用 LOG_FILE 自带的路径，否则退回 LOG_DIR）
+  - LOG_DIR=./logs 指定目录（可选）
+  - LOG_ROTATION=never|daily|hourly|minutely 控制滚动频率（默认 never）
+  - LOG_STDOUT=1 将日志输出到标准输出（可选）
+    '''也可改为 stdout-only，把文件输出交给外部日志系统（如 Loki/Fluent Bit/ELK）处理'''
+
+## Request ID 生成与传递
+
+服务已集成 request-id 中间件：
+
+- 每个入站请求会生成一个 `UUID v4` 的 `request-id` 并写入响应头；
+- 若客户端已携带 `request-id` 请求头，则沿用该值；
+- 该 `request-id` 会被注入到 HTTP tracing span 中的 `request_id` 字段，用于关联请求全链路日志；
+- 默认头名：`x-request-id`，可通过环境变量覆盖：
+
+  - `REQ_ID_HEADER`（示例：`REQ_ID_HEADER=X-Correlation-ID`）。
+
+示例：
+
+1.  让服务自动生成 request-id
+
+         curl -i http://127.0.0.1:8080/health
+
+    响应头中会包含：`x-request-id: <uuid>`，日志中对应字段 `request_id` 同步出现。
+
+2.  由客户端传入自定义 request-id（并传播回响应）
+
+         curl -i -H 'x-request-id: my-trace-123' http://127.0.0.1:8080/health
+
+    响应头仍为 `x-request-id: my-trace-123`，并写入日志 span。
