@@ -19,8 +19,12 @@ pub async fn listen_app() -> Result<()> {
         },
     };
     let app = axum::Router::new()
-        .route("/show/{id}", axum::routing::get(show_manager::show_with_id))
+        .route(
+            "/shows/{id}",
+            axum::routing::get(show_manager::show_with_id),
+        )
         .with_state(state);
+    println!("Listening on 127.0.0.1:3000");
     let listener = tokio::net::TcpListener::bind("127.0.0.1:3000").await?;
     let _ = axum::serve(listener, app).await;
     Ok(())

@@ -34,9 +34,13 @@ Run migrations (optional; the app can also run them at startup when wired):
 
 Seed mock data (writes 3 demo shows into Postgres):
 
-Use the VS Code task "Dev: Seed Mock Data" or run:
+Use the unified dev-tools:
 
-    cargo run --bin dev-seed-mock-data --manifest-path backend/Cargo.toml
+    cargo run --bin dev-tools --manifest-path backend/Cargo.toml -- seed
+
+Update show name on-chain:
+
+    cargo run --bin dev-tools --manifest-path backend/Cargo.toml -- update-show <show_id> <name> <metadata_uri>
 
 Integration tests (ignored by default; require DATABASE_URL):
 
