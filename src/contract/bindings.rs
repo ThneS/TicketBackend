@@ -4,40 +4,40 @@ sol! {
     #[sol(rpc)]
     #[derive(Debug)]
     TicketManager,
-    "src/abis/TicketManager.json"
+    "src/contract/abis/TicketManager.json"
 }
 
 sol! {
     #[sol(rpc)]
     #[derive(Debug)]
     EventManager,
-    "src/abis/EventManager.json"
+    "src/contract/abis/EventManager.json"
 }
 
 sol! {
     #[sol(rpc)]
     #[derive(Debug)]
     TokenSwap,
-    "src/abis/TokenSwap.json"
+    "src/contract/abis/TokenSwap.json"
 }
 
 sol! {
     #[sol(rpc)]
     #[derive(Debug)]
     Marketplace,
-    "src/abis/Marketplace.json"
+    "src/contract/abis/Marketplace.json"
 }
 
 sol! {
     #[sol(rpc)]
     #[derive(Debug)]
     DIDRegistry,
-    "src/abis/DIDRegistry.json"
+    "src/contract/abis/DIDRegistry.json"
 }
 
 sol! {
     #[sol(rpc)]
     #[derive(Debug)]
     ShowManager,
-    "src/abis/ShowManager.json"
+    "src/contract/abis/ShowManager.json"
 }

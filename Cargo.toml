@@ -8,10 +8,14 @@ alloy = { version = "1.0.24", features = ["full"] }
 axum = { version = "0.8.4", features = ["http2", "query", "tracing", "multipart", "macros"] }
 dotenv = "0.15.0"
 eyre = "0.6.12"
-sqlx = { version = "0.8.6", features = ["postgres", "runtime-tokio-rustls"] }
+sqlx = { version = "0.8.6", features = ["chrono", "postgres", "runtime-tokio-rustls", "bigdecimal", "migrate"] }
+bigdecimal = { version = "0.4", features = ["serde"] }
 tokio = { version = "1.47.1", features = ["full"] }
 futures = "0.3"
 futures-util = "0.3.31"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 hex = "0.4"
+chrono = { version = "0.4.42", features = ["serde"] }
+redis = { version = "0.32.5", features = ["tokio-comp"] }
+num-bigint = { version = "0.4.6", features = ["serde"] }

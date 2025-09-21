@@ -1,3 +1,4 @@
+pub mod redis_cache;
 use eyre::Result;
 
 use sqlx::{PgPool, postgres::PgPoolOptions};
@@ -33,7 +34,8 @@ impl Db {
 
 // Migration helper (expects sqlx-cli or external migration runner). For now a stub.
 #[allow(unused)]
-pub async fn run_migrations(_pool: &PgPool) -> Result<()> {
-    // You can later integrate: sqlx::migrate!("migrations").run(pool).await?;
+pub async fn run_migrations(pool: &PgPool) -> Result<()> {
+    // Run embedded migrations from the `migrations/` folder
+    sqlx::migrate!("./migrations").run(pool).await?;
     Ok(())
 }
