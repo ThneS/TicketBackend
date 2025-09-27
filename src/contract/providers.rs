@@ -54,6 +54,7 @@ pub async fn init_pool() -> Result<&'static ProviderPool> {
         ws_listener: listener,
         ws_reader: reader,
     };
+    tracing::info!("Initialized ProviderPool with ws_rpc_url={}", url);
     let _ = POOL.set(pool);
     Ok(POOL.get().expect("provider pool must be initialized"))
 }

@@ -11,6 +11,7 @@ impl Db {
         database_url: &str,
         max_connections: u32,
     ) -> Result<Self> {
+        tracing::info!("Connecting to database at {}", database_url);
         let pool = PgPoolOptions::new()
             .max_connections(max_connections)
             .after_connect(|conn, _meta| {

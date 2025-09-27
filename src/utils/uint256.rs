@@ -1,7 +1,7 @@
 use alloy::primitives::Uint;
 use bigdecimal::BigDecimal;
 use hex;
-use num_bigint::BigUint;
+use num_bigint::{BigInt, BigUint, Sign};
 use sqlx::{
     Postgres, Type,
     decode::Decode,
@@ -14,6 +14,12 @@ use std::{fmt, str::FromStr};
 /// 数据库存储用的本地包装类型，解决 orphan rule：为本地类型实现外部 trait
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DbU256(pub U256);
+
+impl From<u64> for DbU256 {
+    fn from(v: u64) -> Self {
+        DbU256(U256::from(v))
+    }
+}
 
 impl serde::Serialize for DbU256 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -154,15 +160,16 @@ pub fn biguint_to_u256(value: &BigUint) -> U256 {
 
 /// Uint256 -> BigDecimal
 pub fn u256_to_bigdecimal(value: U256) -> BigDecimal {
-    let s = value.to_string(); // Uint 实现了 Display
-    BigDecimal::from_str(&s).unwrap()
+    // 直接通过 BigInt 构造，避免字符串中转
+    let bu = u256_to_biguint(value);
+    let bi = BigInt::from(bu);
+    BigDecimal::from(bi)
 }
 
 /// BigDecimal -> Uint256
 pub fn bigdecimal_to_u256(value: &BigDecimal) -> U256 {
-    let s = value.to_string();
-    let big_uint = BigUint::from_str(&s).unwrap();
-    biguint_to_u256(&big_uint)
+    // 使用严格路径，避免字符串中转
+    DbU256::try_from(value).unwrap().0
 }
 
 /// BigUint -> BigDecimal
@@ -195,10 +202,58 @@ impl<'q> Encode<'q, Postgres> for DbU256 {
         buf: &mut <Postgres as sqlx::Database>::ArgumentBuffer<'q>,
     ) -> Result<sqlx::encode::IsNull, Box<dyn std::error::Error + Send + Sync>>
     {
-        let s = self.0.to_string(); // U256 -> String
-        let big_decimal = BigDecimal::from_str(&s).unwrap();
-        // 直接委托给 BigDecimal 的实现
-        big_decimal.encode_by_ref(buf)
+        // 通过 BigInt -> BigDecimal 构造，确保 scale=0，避免字符串中转
+        let bu = u256_to_biguint(self.0);
+        let bi = BigInt::from(bu);
+        let bd = BigDecimal::from(bi);
+        bd.encode_by_ref(buf)
+    }
+}
+
+/// 严格的 BigDecimal -> DbU256 转换（尽量避免字符串中转）
+impl TryFrom<&BigDecimal> for DbU256 {
+    type Error = Box<dyn std::error::Error + Send + Sync>;
+
+    fn try_from(bd: &BigDecimal) -> Result<Self, Self::Error> {
+        // 判定是否为整数：若与向零取整后的值相等（按数值相等），则认为是整数（包括 123.000）
+        let scaled_down = bd.with_scale(0); // 向零取整
+        if &scaled_down != bd {
+            return Err("fractional numeric not supported for U256".into());
+        }
+
+        // 现在是整数，取其非负校验并转为 BigInt/bytes
+        // BigDecimal -> BigInt 最稳妥的方法：字符串中转或通过 to_bytes_be (不可用)。
+        // 为保证兼容 bigdecimal 0.4，我们使用最小字符串中转但经过上面的整数性校验。
+        let s = bd.with_scale(0).to_string();
+        let bi = BigInt::from_str(&s)?;
+        big_int_to_db_u256(bi)
+    }
+}
+
+impl TryFrom<BigDecimal> for DbU256 {
+    type Error = Box<dyn std::error::Error + Send + Sync>;
+
+    fn try_from(bd: BigDecimal) -> Result<Self, Self::Error> {
+        DbU256::try_from(&bd)
+    }
+}
+
+fn big_int_to_db_u256(
+    bi: BigInt,
+) -> Result<DbU256, Box<dyn std::error::Error + Send + Sync>> {
+    match bi.to_bytes_be() {
+        (Sign::Minus, _) => {
+            Err("negative numeric cannot be represented as U256".into())
+        }
+        (_, bytes) => {
+            if bytes.len() > 32 {
+                return Err("numeric too large for U256".into());
+            }
+            let mut padded = [0u8; 32];
+            let offset = 32 - bytes.len();
+            padded[offset..].copy_from_slice(&bytes);
+            Ok(DbU256(U256::from_be_bytes::<32>(padded)))
+        }
     }
 }
 
@@ -209,16 +264,7 @@ impl<'r> Decode<'r, Postgres> for DbU256 {
     ) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         // 从 NUMERIC 取出 BigDecimal
         let big_decimal = <SqlxBigDecimal as Decode<Postgres>>::decode(value)?;
-        let s = big_decimal.to_string();
-        let big_uint = BigUint::from_str(&s)?;
-        // BigUint -> U256
-        Ok(DbU256(U256::from_be_bytes::<32>({
-            let bytes = big_uint.to_bytes_be();
-            let mut padded = [0u8; 32];
-            let offset = 32 - bytes.len();
-            padded[offset..].copy_from_slice(&bytes);
-            padded
-        })))
+        DbU256::try_from(&big_decimal)
     }
 }
 
@@ -268,5 +314,33 @@ mod tests {
         assert_eq!(s, "\"0xff\"");
         let HexWrap(back) = serde_json::from_str(&s).unwrap();
         assert_eq!(v.to_string(), back.to_string());
+    }
+
+    #[test]
+    fn test_bigdecimal_to_db_u256_strict() {
+        // valid integer-like inputs
+        let cases = vec![
+            ("0", "0"),
+            ("+0", "0"),
+            ("0000", "0"),
+            ("123", "123"),
+            ("+123", "123"),
+            ("000123", "123"),
+            ("123.0", "123"),
+            ("123.000000", "123"),
+        ];
+        for (s, expect) in cases {
+            let bd = BigDecimal::from_str(s).unwrap();
+            let v = DbU256::try_from(&bd).unwrap();
+            assert_eq!(v.to_string(), expect);
+        }
+
+        // negative
+        let neg = BigDecimal::from_str("-1").unwrap();
+        assert!(DbU256::try_from(&neg).is_err());
+
+        // fractional non-zero
+        let frac = BigDecimal::from_str("1.5").unwrap();
+        assert!(DbU256::try_from(&frac).is_err());
     }
 }

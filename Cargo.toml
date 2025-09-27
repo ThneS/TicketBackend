@@ -23,5 +23,24 @@ clap = { version = "4.5.15", features = ["derive"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 tracing-appender = "0.2"
-tower-http = { version = "0.5", features = ["trace", "request-id"] }
+tracing-opentelemetry = { version = "0.23", optional = true }
+opentelemetry = { version = "0.23", optional = true }
+opentelemetry_sdk = { version = "0.23", features=["rt-tokio"], optional = true }
+opentelemetry-otlp = { version = "0.16", features = ["grpc-tonic", "http-proto"], optional = true }
+tower-http = { version = "0.5", features = ["trace", "request-id", "cors"] }
 bytes = "1"
+async-trait = "0.1"
+thiserror = "1"
+
+[features]
+default = []
+otel = [
+	"tracing-opentelemetry",
+	"opentelemetry",
+	"opentelemetry_sdk",
+	"opentelemetry-otlp",
+]
+
+[dev-dependencies]
+tower = { version = "0.5" }
+http = "0.2"

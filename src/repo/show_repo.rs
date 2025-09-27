@@ -297,5 +297,27 @@ pub async fn get_show_by_id(
     .bind(show_id)
     .fetch_optional(pool)
     .await?;
+    tracing::debug!(?rec, "Queried show by id");
     Ok(rec)
+}
+
+pub async fn repo_list_shows(
+    pool: &PgPool,
+    limit: i64,
+    offset: i64,
+) -> Result<Vec<ShowDataRecord>> {
+    let recs = sqlx::query_as::<_, ShowDataRecord>(
+        r#"
+        SELECT id, name, description, location, event_time, ticket_price, max_tickets, sold_tickets, is_active, organizer, created_at
+        FROM shows
+        ORDER BY created_at DESC
+        LIMIT $1 OFFSET $2;
+        "#,
+    )
+    .bind(limit)
+    .bind(offset)
+    .fetch_all(pool)
+    .await?;
+    tracing::debug!(count = recs.len(), "Listed shows");
+    Ok(recs)
 }
